@@ -1,6 +1,4 @@
 ///<reference path="node_modules/makerjs/index.d.ts" />
-///<reference path="node_modules/jszip/index.d.ts" />
-///<reference lib="es2017.object" />
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -11,8 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
-    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
@@ -38,7 +36,6 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var makerjs = require('makerjs');
-var JSZip = require('jszip');
 var App = /** @class */ (function () {
     function App() {
         var _this = this;
@@ -57,35 +54,16 @@ var App = /** @class */ (function () {
             var v = f.variants.forEach(function (v) { return _this.addOption(_this.selectVariant, v); });
             _this.renderCurrent();
         };
-        this.downloadSvg = function () { return __awaiter(_this, void 0, void 0, function () {
-            var svgs, filenames, svgFiles, zip, _i, svgFiles_1, file, blob, url, a;
-            var _this = this;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        svgs = this.outputTextarea.value.split(',');
-                        filenames = this.textInput.value.split(/\n/);
-                        svgFiles = svgs.map(function (content, i) { return ({ name: "".concat(filenames[i], ".svg"), content: _this.addNamespace(content) }); });
-                        zip = new JSZip();
-                        for (_i = 0, svgFiles_1 = svgFiles; _i < svgFiles_1.length; _i++) {
-                            file = svgFiles_1[_i];
-                            zip.file(file.name, file.content);
-                        }
-                        return [4 /*yield*/, zip.generateAsync({ type: "blob" })];
-                    case 1:
-                        blob = _a.sent();
-                        url = URL.createObjectURL(blob);
-                        a = document.createElement("a");
-                        a.href = url;
-                        a.download = "svg_archive_".concat(Date.now(), ".zip");
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        return [2 /*return*/];
-                }
-            });
-        }); };
+        this.downloadSvg = function () {
+            const inputs = _this.textInput.value.split(/\n/);
+            _this.outputTextarea.value.split(",").forEach((v, i) => {
+                console.log('input', inputs[i]);
+                var SvgFile = window.btoa(v);
+                    _this.downloadButton.href = 'data:image/svg+xml;base64,' + SvgFile;
+                    _this.downloadButton.download = inputs[i]
+            })
+            
+        };
         this.downloadDxf = function () {
             var dxfFile = window.btoa(_this.renderDiv.getAttribute('data-dxf'));
             _this.dxfButton.href = 'data:application/dxf;base64,' + dxfFile;
@@ -163,13 +141,6 @@ var App = /** @class */ (function () {
             _this.renderCurrent();
         };
     }
-    App.prototype.addNamespace = function (svg) {
-        var namespace = 'http://www.w3.org/2000/svg';
-        if (!svg.includes('xmlns="')) {
-            return svg.replace('<svg', "<svg xmlns=\"".concat(namespace, "\" xmlns:xlink=\"http://www.w3.org/1999/xlink\""));
-        }
-        return svg;
-    };
     App.prototype.init = function () {
         var _this = this;
         this.errorDisplay = this.$('#error-display');
@@ -274,10 +245,10 @@ var App = /** @class */ (function () {
                                                                                     this.renderCurrent;
         // Is triggered on the document whenever a new color is picked
         document.addEventListener("coloris:pick", debounce(this.renderCurrent));
-        //this.copyToClipboardBtn.onclick = this.copyToClipboard;
+        this.copyToClipboardBtn.onclick = this.copyToClipboard;
         this.downloadButton.onclick = this.downloadSvg;
-        //this.dxfButton.onclick = this.downloadDxf;
-        //this.createLinkButton.onclick = this.updateUrl;
+        this.dxfButton.onclick = this.downloadDxf;
+        this.createLinkButton.onclick = this.updateUrl;
     };
     App.prototype.$ = function (selector) {
         return document.querySelector(selector);
@@ -287,9 +258,6 @@ var App = /** @class */ (function () {
         option.text = optionText;
         option.value = optionText;
         select.options.add(option);
-        if (optionText === "Pacifico") {
-            select.value = optionText;
-        }
     };
     App.prototype.getGoogleFonts = function (apiKey) {
         var _this = this;
@@ -322,12 +290,13 @@ var App = /** @class */ (function () {
         });
         var dxf = makerjs.exporter.toDXF(textModel, { units: units, usePOLYLINE: true });
         this.renderDiv.innerHTML = svg;
-        //this.renderDiv.setAttribute('data-dxf', dxf);
+        this.renderDiv.setAttribute('data-dxf', dxf);
         this.outputTextarea.value = svg;
     };
-    App.prototype.renderMakerjsOutput = function (font, texts, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule) {
-        var textsArray = texts.split(/\n/);
-        var svgsArray = textsArray.map(function (t) {
+    App.prototype.renderMakerjsOutput = function(font, texts, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule) {
+        const textsArray = texts.split(/\n/);
+
+        const svgsArray = textsArray.map(t => {
             //generate the text using a font
             var textModel = new makerjs.models.Text(font, t, size, union, false, bezierAccuracy, { kerning: kerning });
             if (separate) {
@@ -343,20 +312,13 @@ var App = /** @class */ (function () {
                 scalingStroke: !strokeNonScaling,
             });
             var dxf = makerjs.exporter.toDXF(textModel, { units: units, usePOLYLINE: true });
-            return { svg: svg, dxf: dxf };
-        });
-        this.renderDiv.innerHTML = svgsArray.map(function (_a) {
-            var svg = _a.svg;
-            return svg;
-        }).join("<br/>");
-        this.renderDiv.setAttribute('data-dxf', svgsArray.map(function (_a) {
-            var dxf = _a.dxf;
-            return dxf;
-        }).join());
-        this.outputTextarea.value = svgsArray.map(function (_a) {
-            var svg = _a.svg;
-            return svg;
-        }).join();
+            return {svg, dxf}
+        })
+
+        
+        this.renderDiv.innerHTML = svgsArray.map(({svg}) => svg).join();
+        this.renderDiv.setAttribute('data-dxf', svgsArray.map(({dxf}) => dxf).join());
+        this.outputTextarea.value = svgsArray.map(({svg}) => svg).join();
     };
     App.prototype.render = function (fontIndex, variantIndex, text, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule) {
         var _this = this;
@@ -372,7 +334,9 @@ var App = /** @class */ (function () {
                     _this.errorDisplay.innerHTML = err.toString();
                 }
                 else {
+                    
                     _this.renderMakerjsOutput(font, text, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule);
+                   
                 }
             });
         }

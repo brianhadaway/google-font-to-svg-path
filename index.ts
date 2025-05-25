@@ -1,6 +1,9 @@
 ///<reference path="node_modules/makerjs/index.d.ts" />
+///<reference path="node_modules/jszip/index.d.ts" />
+///<reference lib="es2017.object" />
 
 const makerjs = require('makerjs') as typeof MakerJs;
+const JSZip = require('jszip') as typeof JSZip;
 
 type FillRule = 'nonzero' | 'evenodd';
 
@@ -64,10 +67,38 @@ class App {
         const v = f.variants.forEach(v => this.addOption(this.selectVariant, v));
         this.renderCurrent();
     };
-    private downloadSvg = () => {
-        const SvgFile = window.btoa(this.outputTextarea.value);
-        this.downloadButton.href = 'data:image/svg+xml;base64,' + SvgFile;
-        this.downloadButton.download = this.textInput.value;
+
+    private addNamespace(svg){
+        const namespace = 'http://www.w3.org/2000/svg';
+            
+        if (!svg.includes('xmlns="')) {
+            return svg.replace('<svg', `<svg xmlns="${namespace}" xmlns:xlink="http://www.w3.org/1999/xlink"`);
+        }
+
+        return svg;
+    }
+
+    private downloadSvg = async () => {
+        const svgs = this.outputTextarea.value.split(',');
+        const filenames = this.textInput.value.split(/\n/);
+
+        const svgFiles = svgs.map((content, i) => ({name: `${filenames[i]}.svg`, content: this.addNamespace(content)}))
+
+        const zip = new JSZip();
+
+        for (const file of svgFiles) {
+            zip.file(file.name, file.content);
+        }
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `svg_archive_${Date.now()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
     private downloadDxf = () => {
         const dxfFile = window.btoa(this.renderDiv.getAttribute('data-dxf'));
@@ -274,10 +305,10 @@ class App {
         // Is triggered on the document whenever a new color is picked
         document.addEventListener("coloris:pick", debounce(this.renderCurrent))
 
-        this.copyToClipboardBtn.onclick = this.copyToClipboard;
+        //this.copyToClipboardBtn.onclick = this.copyToClipboard;
         this.downloadButton.onclick = this.downloadSvg;
-        this.dxfButton.onclick = this.downloadDxf;
-        this.createLinkButton.onclick = this.updateUrl;
+        //this.dxfButton.onclick = this.downloadDxf;
+        //this.createLinkButton.onclick = this.updateUrl;
     }
 
     $(selector: string) {
@@ -289,6 +320,10 @@ class App {
         option.text = optionText;
         option.value = optionText;
         select.options.add(option);
+
+        if(optionText === "Pacifico"){
+            select.value = optionText;
+        }
     }
 
     getGoogleFonts(apiKey: string) {
@@ -328,9 +363,38 @@ class App {
         const dxf = makerjs.exporter.toDXF(textModel, { units: units, usePOLYLINE: true });
 
         this.renderDiv.innerHTML = svg;
-        this.renderDiv.setAttribute('data-dxf', dxf);
+        //this.renderDiv.setAttribute('data-dxf', dxf);
         this.outputTextarea.value = svg;
     }
+
+    renderMakerjsOutput(font: opentype.Font, texts: string, size: number, union: boolean, filled: boolean, kerning: boolean, separate: boolean,
+        bezierAccuracy: number, units: string, fill: string, stroke: string, strokeWidth: string, strokeNonScaling: boolean, fillRule: FillRule){
+            
+            const textsArray = texts.split(/\n/);
+            const svgsArray = textsArray.map(t => {
+                        //generate the text using a font
+                        var textModel = new makerjs.models.Text(font, t, size, union, false, bezierAccuracy, { kerning: kerning });
+                        if (separate) {
+                            for (var i in textModel.models) {
+                                textModel.models[i].layer = i;
+                            }
+                        }
+                        var svg = makerjs.exporter.toSVG(textModel, {
+                            fill: filled ? fill : undefined,
+                            stroke: stroke ? stroke : undefined,
+                            strokeWidth: strokeWidth ? strokeWidth : undefined,
+                            fillRule: fillRule ? fillRule : undefined,
+                            scalingStroke: !strokeNonScaling,
+                        });
+                        var dxf = makerjs.exporter.toDXF(textModel, { units: units, usePOLYLINE: true });
+                        return {svg, dxf}
+                    })
+
+                    
+                    this.renderDiv.innerHTML = svgsArray.map(({svg}) => svg).join("<br/>");
+                    this.renderDiv.setAttribute('data-dxf', svgsArray.map(({dxf}) => dxf).join());
+                    this.outputTextarea.value = svgsArray.map(({svg}) => svg).join();
+        }
 
     render(
         fontIndex: number,
@@ -361,7 +425,7 @@ class App {
                 if (err) {
                     this.errorDisplay.innerHTML = err.toString();
                 } else {
-                    this.callMakerjs(font, text, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule);
+                    this.renderMakerjsOutput(font, text, size, union, filled, kerning, separate, bezierAccuracy, units, fill, stroke, strokeWidth, strokeNonScaling, fillRule);
                 }
             });
         }
